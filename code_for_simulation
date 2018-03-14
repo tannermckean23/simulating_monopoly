@@ -1,0 +1,558 @@
+# the game board
+
+gameboard <- data.frame(space = 1:40, title = c("Go" , "Mediterranean Avenue" , "Community Chest" , "Baltic Avenue" , "Income Tax" , "Reading Railroad" , "Oriental Avenue" , "Chance" , "Vermont Avenue" , "Connecticut Avenue" , "Jail" , "St. Charles Place" , "Electric Company" , "States Avenue" , "Virginia Avenue" , "Pennsylvania Railroad" , "St. James Place" , "Community Chest" , "Tennessee Avenue" , "New York Avenue" , "Free Parking" , "Kentucky Avenue" , "Chance" , "Indiana Avenue" , "Illinois Avenue" , "B & O Railroad" , "Atlantic Avenue" , "Ventnor Avenue" , "Water Works" , "Marvin Gardens" , "Go to jail" , "Pacific Avenue" , "North Carolina Avenue" , "Community Chest" , "Pennsylvania Avenue" , "Short Line Railroad" , "Chance" , "Park Place" , "Luxury Tax" , "Boardwalk"))
+
+# the chance deck
+
+chancedeck <- data.frame(index = 1:15, card = c("Advance to Go" , "Advance to Illinois Ave." , "Advance to St. Charles Place" , "Advance token to nearest Utility" , "Advance token to the nearest Railroad" , "Take a ride on the Reading Railroad" , "Take a walk on the Boardwalk" , "Go to Jail" , "Go Back 3 Spaces" , "Bank pays you dividend of $50" , "Get out of Jail Free" , "Make general repairs on all your property" , "Pay poor tax of $15" , "You have been elected Chairman of the Board" , "Your building loan matures"))
+
+# the community chest deck
+
+communitydeck <- data.frame(index = 1:16, card = c("Advance to Go" , "Go to Jail" , "Bank error in your favor. Collect $200" , "Doctor's fees Pay $50" , "From sale of stock you get $45" , "Get Out of Jail Free" , "Grand Opera Night Opening" , "Xmas Fund matures" , "Income tax refund" , "Life insurance matures. Collect $100" , "Pay hospital fees of $100" , "Pay school tax of $150" , "Receive for services $25" , "You are assessed for street repairs" , "You have won second prize in a beauty contest" , "You inherit $100"))
+
+# dice
+
+dice <- function(verbose=FALSE){
+  faces <- sample(1:6, 2, replace=TRUE)
+  if(faces[1] == faces[2]) doubles = TRUE
+  else doubles = FALSE
+  movement = sum(faces)
+  if(verbose) cat("Rolled:", faces[1], faces[2], "\n")
+  return(list(faces=faces, doubles=doubles, movement=movement))
+}
+
+# manual dice
+
+Dice = setRefClass("Dice", 
+                   fields = list(
+                     rolls = "numeric",
+                     pos = "numeric",
+                     verbose = "logical"
+                   ), 
+                   methods = list(
+                     roll = function() {
+                       faces = rolls[pos + seq_len(2)]
+                       pos <<- pos + 2
+                       if(faces[1] == faces[2]) doubles = TRUE
+                       else doubles = FALSE
+                       movement = sum(faces)
+                       if(verbose) cat("Rolled:", faces[1], faces[2], "\n")
+                       return(list(faces=faces, doubles=doubles, movement=movement))
+                     }
+                   )
+)
+
+# player reference class
+
+# from the original, in_jail and turns_in_jail have been added
+# functions place_in_jail and jail_count have been added
+
+player <- setRefClass("player", 
+                      fields = list(
+                        pos = "numeric",      # position on the board
+                        in_jail = "logical",  # whether or not the player is in jail
+                        turns_in_jail = "numeric", # how many turns in jail
+                        verbose = "logical"
+                      ), 
+                      methods = list(
+                        move_n = function(n) {
+                          if(verbose) cat("Player at:", pos)
+                          if(verbose) cat(" Player moves:", n)
+                          pos <<- pos + n
+                          if(pos > 40) pos <<- pos - 40
+                          if(verbose) cat(" Player now at:", pos,"\n")
+                        },
+                        go_2_space_n = function(n){
+                          if(verbose) cat("Player at:", pos,".")
+                          if(is.na(n)) {
+                            pos <<- pos
+                          } else pos <<- n
+                          if(verbose) cat(" Player now at:", pos,".\n")
+                        },
+                        place_in_jail = function(n){
+                          in_jail <<- n
+                          if(verbose & in_jail == TRUE) cat("Player is now in jail.")
+                        },
+                        jail_count = function(n) {
+                          turns_in_jail <<- n
+                          if(verbose) cat("Player has been in jail for",
+                                          turns_in_jail, "turns.")
+                        }
+                      )
+)
+
+# space tracking reference class
+
+tracking <- setRefClass("tracking",
+                        fields = list(
+                          tally = "numeric"
+                        ),
+                        methods = list(
+                          increase_count = function(n){
+                            tally[n] <<- tally[n] + 1
+                          }
+                        )
+)
+
+space_tracking <- tracking$new(tally = rep(0,40))
+
+# chance card ##################################################################################
+
+# I made the 3 different chance functions
+# there is a function for all 3 of the chance spaces
+# this easily accounts for sending players to nearest
+# spaces as well as move back 3 spaces
+
+# each returns move, which is where the player should
+# be placed, and status, which says whether or not
+# they are in jail
+
+chance_card_8 <- function(verbose=FALSE) {
+  
+  card <- sample(1:15, 1, replace = TRUE) # sample the cards
+  
+  if (card == 1) {
+    move <- 1
+    status <- FALSE
+    return(list(move=move, status=status))
+  } else if (card == 2) {
+    move <- 25
+    status <- FALSE
+    return(list(move=move, status=status))
+  } else if (card == 3) {
+    move <- 12
+    status <- FALSE
+    return(list(move=move, status=status))
+  } else if (card == 4) {
+      move <- 13
+      status <- FALSE
+      return(list(move=move, status=status))
+  } else if (card == 5) {
+    move <- 16
+    status <- FALSE
+    return(list(move=move, status=status))
+  } else if (card == 6) {
+    move <- 6
+    status <- FALSE
+    return(list(move=move, status=status))
+  } else if (card == 7) {
+    move <- 40
+    status <- FALSE
+    return(list(move=move, status=status))
+  } else if (card == 8) {
+    move <- 11
+    status <- TRUE
+    return(list(move=move, status=status))
+  } else if (card == 9) {
+    move <- 5
+    status <- FALSE
+    return(list(move=move, status=status))
+  } else {
+    move <- NA
+    status <- FALSE
+    return(list(move=move, status=status))
+  }
+}
+
+# if they land on space 23
+chance_card_23 <- function(verbose=FALSE) {
+  
+  card <- sample(1:15, 1, replace = TRUE) # sample the cards
+  
+  if (card == 1) {
+    move <- 1
+    status <- FALSE
+    return(list(move=move, status=status))
+  } else if (card == 2) {
+    move <- 25
+    status <- FALSE
+    return(list(move=move, status=status))
+  } else if (card == 3) {
+    move <- 12
+    status <- FALSE
+    return(list(move=move, status=status))
+  } else if (card == 4) {
+    move <- 29
+    status <- FALSE
+    return(list(move=move, status=status))
+  } else if (card == 5) {
+    move <- 26
+    status <- FALSE
+    return(list(move=move, status=status))
+  } else if (card == 6) {
+    move <- 6
+    status <- FALSE
+    return(list(move=move, status=status))
+  } else if (card == 7) {
+    move <- 40
+    status <- FALSE
+    return(list(move=move, status=status))
+  } else if (card == 8) {
+    move <- 11
+    status <- TRUE
+    return(list(move=move, status=status))
+  } else if (card == 9) {
+    move <- 20
+    status <- FALSE
+    return(list(move=move, status=status))
+  } else {
+    move <- NA
+    status <- FALSE
+    return(list(move=move, status=status))
+  }
+}
+
+# if they land on 37
+chance_card_37 <- function(verbose=FALSE) {
+  
+  card <- sample(1:15, 1, replace = TRUE) # sample the cards
+  
+  if (card == 1) {
+    move <- 1
+    status <- FALSE
+    return(list(move=move, status=status))
+  } else if (card == 2) {
+    move <- 25
+    status <- FALSE
+    return(list(move=move, status=status))
+  } else if (card == 3) {
+    move <- 12
+    status <- FALSE
+    return(list(move=move, status=status))
+  } else if (card == 4) {
+    move <- 13
+    status <- FALSE
+    return(list(move=move, status=status))
+  } else if (card == 5) {
+    move <- 6
+    status <- FALSE
+    return(list(move=move, status=status))
+  } else if (card == 6) {
+    move <- 6
+    status <- FALSE
+    return(list(move=move, status=status))
+  } else if (card == 7) {
+    move <- 40
+    status <- FALSE
+    return(list(move=move, status=status))
+  } else if (card == 8) {
+    move <- 11
+    status <- TRUE
+    return(list(move=move, status=status))
+  } else if (card == 9) {
+    move <- 34
+    status <- FALSE
+    return(list(move=move, status=status))
+  } else {
+    move <- NA
+    status <- FALSE
+    return(list(move=move, status=status))
+  }
+}
+
+# drawing community chest card #################################################################
+
+# community card works the same way and returns 
+# move and status
+
+community_card <- function(verbose=FALSE) {
+  
+  card <- sample(1:16, 1, replace = TRUE) # sample the cards
+  
+  if (card == 1) { # if we have a 1, we want to move to go
+    move <- 1
+    status <- FALSE
+    return(list(move=move, status=status))
+  } else if (card == 2) { # if we have a 2, we want to move to jail
+    move <- 11 # if the second card, go to jail
+    status <- TRUE # update that the player is in jail
+    return(list(move=move, status=status))
+  } else { # anything else and we don't want to move
+    move <- NA
+    status <- FALSE
+    return(list(move=move, status=status))
+  }
+}
+
+# landing on go to jail ########################################################################
+
+# go to jail works the same way and returns 
+# move and status
+
+go_to_jail <- function(verbose=FALSE) {
+    move <- 11 # send them to jail
+    status <- TRUE # update that they are in jail
+    return(list(move=move, status=status))
+}
+
+# roll again for rolling doubles ###############################################################
+# going to jail for rolling three doubles ######################################################
+
+# both of these are implemented together
+# to roll again for doubles, we have if statements
+# checking doubles, and does another turn
+
+# if the first or second roll sends the player
+# to jail, we end the turn
+
+# in the third roll of a turn we add another if 
+# statment, and if there is a double we send
+# the player to jail and end the turn
+
+three_in_a_row <- function(verbose=FALSE) {
+  move <- 11
+  status <- TRUE
+  return(list(move=move, status=status))
+} # sends the player to jail and updates jail status
+
+regturn <- function(player, tracking){
+  roll <- dice()
+  player$move_n(roll$movement)
+  
+  if (player$pos == 31) { # if they are on space 31, we need to send them to jail and update their status
+    jail <- go_to_jail()
+    player$go_2_space_n(jail$move)
+    player$place_in_jail(jail$status)
+  }
+  
+  if (player$pos == 3 | player$pos == 18 | player$pos == 34) { # if they are on one of these three spaces, we need to draw a community card
+    community <- community_card()
+    player$go_2_space_n(community$move)
+    player$place_in_jail(community$status)
+  }
+  
+  if (player$pos == 8) {
+    chance <- chance_card_8()
+    player$go_2_space_n(chance$move)
+    player$place_in_jail(chance$status)
+  }
+  
+  if (player$pos == 23) {
+    chance <- chance_card_23()
+    player$go_2_space_n(chance$move)
+    player$place_in_jail(chance$status)
+  }
+  
+  if (player$pos == 37) {
+    chance <- chance_card_37()
+    player$go_2_space_n(chance$move)
+    player$place_in_jail(chance$status)
+    if (player$pos == 34) {
+      community <- community_card()
+      player$go_2_space_n(community$move)
+      player$place_in_jail(community$status)
+    }
+  }
+  
+  tracking$increase_count(player$pos) # tally where they are
+
+  if (player$in_jail == TRUE) return()
+  
+  if (roll$doubles == TRUE) {
+    roll2 <- dice()
+    player$move_n(roll2$movement)
+    
+    if (player$pos == 31) { # if they are on space 31, we need to send them to jail and update their status
+      jail <- go_to_jail()
+      player$go_2_space_n(jail$move)
+      player$place_in_jail(jail$status)
+    }
+    
+    if (player$pos == 3 | player$pos == 18 | player$pos == 34) { # if they are on one of these three spaces, we need to draw a community card
+      community <- community_card()
+      player$go_2_space_n(community$move)
+      player$place_in_jail(community$status)
+    }
+    
+    if (player$pos == 8) {
+      chance <- chance_card_8()
+      player$go_2_space_n(chance$move)
+      player$place_in_jail(chance$status)
+    }
+    
+    if (player$pos == 23) {
+      chance <- chance_card_23()
+      player$go_2_space_n(chance$move)
+      player$place_in_jail(chance$status)
+    }
+    
+    if (player$pos == 37) {
+      chance <- chance_card_37()
+      player$go_2_space_n(chance$move)
+      player$place_in_jail(chance$status)
+      if (player$pos == 34) {
+        community <- community_card()
+        player$go_2_space_n(community$move)
+        player$place_in_jail(community$status)
+      }
+    }
+    
+    tracking$increase_count(player$pos) # tally where they are
+  } else {
+    roll2 <- list()
+    roll2$doubles2 <- FALSE
+  }
+  
+  if (player$in_jail == TRUE) {
+    return()
+  }
+  
+  if (roll2$doubles == TRUE) {
+    roll3 <- dice()
+    player$move_n(roll3$movement)
+    
+    if (roll3$doubles == TRUE) {
+      doubles_check <- three_in_a_row()
+      player$go_2_space_n(doubles_check$move)
+      player$place_in_jail(doubles_check$status)
+      tracking$increase_count(player$pos)
+      return()
+    }
+    
+    if (player$pos == 31) { # if they are on space 31, we need to send them to jail and update their status
+      jail <- go_to_jail()
+      player$go_2_space_n(jail$move)
+      player$place_in_jail(jail$status)
+    }
+    
+    if (player$pos == 3 | player$pos == 18 | player$pos == 34) { # if they are on one of these three spaces, we need to draw a community card
+      community <- community_card()
+      player$go_2_space_n(community$move)
+      player$place_in_jail(community$status)
+    }
+    
+    if (player$pos == 8) {
+      chance <- chance_card_8()
+      player$go_2_space_n(chance$move)
+      player$place_in_jail(chance$status)
+    }
+    
+    if (player$pos == 23) {
+      chance <- chance_card_23()
+      player$go_2_space_n(chance$move)
+      player$place_in_jail(chance$status)
+    }
+    
+    if (player$pos == 37) {
+      chance <- chance_card_37()
+      player$go_2_space_n(chance$move)
+      player$place_in_jail(chance$status)
+      if (player$pos == 34) {
+        community <- community_card()
+        player$go_2_space_n(community$move)
+        player$place_in_jail(community$status)
+      }
+    }
+    
+    tracking$increase_count(player$pos) # tally where they are
+  }
+  
+}
+
+# jail functionality ###########################################################################
+
+# there are three different jail functions, one for each possible turn being in jail
+
+# jail turn 1 and 2 check if a dobule is rolled and return movement, status, and turns
+# movement is how far to move, status is whether or not in jail, turns is turns in jail
+
+# jail turn 3 returns how far to move, whether or not in jail, and turns in jail
+
+jail_turn_1 <- function(verbose=FALSE) {
+  jail_roll <- dice()
+  if (jail_roll$doubles == TRUE) {
+    movement <- jail_roll$movement
+    status <- FALSE
+    turns <- 0
+    return(list(movement=movement, status=status, turns=turns))
+  } else {
+    movement <- 0
+    status <- TRUE
+    turns <- 1
+    return(list(movement=movement, status=status, turns=turns))
+  }
+}
+
+jail_turn_2 <- function(verbose=FALSE) {
+  jail_roll2 <- dice()
+  if (jail_roll2$doubles == TRUE) {
+    movement <- jail_roll2$movement
+    status <- FALSE
+    turns <- 0
+    return(list(movement=movement, status=status, turns=turns))
+  } else {
+    movement <- 0
+    status <- TRUE
+    turns <- 2
+    return(list(movement=movement, status=status, turns=turns))
+  }
+}
+
+jail_turn_3 <- function(verbose=FALSE) {
+  jail_roll3 <- dice()
+  movement <- jail_roll3$movement
+  status <- FALSE
+  turns <- 0
+  return(list(movement=movement, status=status, turns=turns))
+}
+
+# taketurn now combines regturn and the 3 jail turns
+
+taketurn <- function(player, tracking) {
+  
+  if(player$in_jail == FALSE) {
+    regturn(player, tracking)
+  } else if (player$in_jail == TRUE & player$turns_in_jail == 0) {
+    
+    roll <- jail_turn_1() # do the jail roll for being there no turns
+    
+    player$move_n(roll$movement) # move the player, its a 0 if not a double
+    player$place_in_jail(roll$status) # update their jail status
+    player$jail_count(roll$turns) # update their turns in jail
+    chance_card_23(player) # check if they landed on chance
+    
+    tracking$increase_count(player$pos) # tally where they are
+  } else if (player$in_jail == TRUE & player$turns_in_jail == 1) {
+    roll <- jail_turn_2()
+    
+    player$move_n(roll$movement)
+    player$place_in_jail(roll$status)
+    player$jail_count(roll$turns)
+    chance_card_23(player) # check if they landed on chance
+    
+    tracking$increase_count(player$pos) # tally where they are
+  } else if (player$in_jail == TRUE & player$turns_in_jail == 2) {
+    roll <- jail_turn_3()
+    
+    player$move_n(roll$movement)
+    player$place_in_jail(roll$status)
+    player$jail_count(roll$turns)
+    community_card(player) # since it doesn't have to be a double, they can now land here
+    chance_card_23(player)
+    
+    tracking$increase_count(player$pos) # tally where they are
+  }
+}
+
+
+set.seed(1)
+
+space_tracking <- tracking$new(tally = rep(0,40))
+for(i in 1:1000){ # simulate 1000 games
+  #cat("#### NEW GAME",i,"##### \n")
+  player1 <- player$new(pos = 1, verbose = FALSE, in_jail = FALSE, turns_in_jail = 0)  # new players for each game
+  player2 <- player$new(pos = 1, verbose = FALSE, in_jail = FALSE, turns_in_jail = 0)
+  for(i in 1:150){ # 150 turns for each game
+    if(player1$verbose) cat("Player 1 turn\n")
+    taketurn(player1, space_tracking)  
+    if(player2$verbose) cat("Player 2 turn\n")
+    taketurn(player2, space_tracking)  
+  }
+}
+# the results after 1000 turns
+results <- cbind(gameboard, tally = space_tracking$tally)
+results <- cbind(results, rel = results$tally/sum(results$tally))
+print(results[order(results$tally, decreasing = TRUE),])
+print(results)
+sum(results$tally)
+
